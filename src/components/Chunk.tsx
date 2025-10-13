@@ -1,11 +1,39 @@
 import { useMemo } from 'react'
 import { makeNoise2D } from 'open-simplex-noise'
 
+export interface NoiseSettings {
+  // General
+  noiseType: string
+  rotationType3D: string
+  seed: number
+  frequency: number
+  // Fractal
+  fractalType: string
+  fractalOctaves: number
+  fractalLacunarity: number
+  fractalGain: number
+  fractalWeightedStrength: number
+  fractalPingPongStrength: number
+  // Cellular
+  cellularDistanceFunction: string
+  cellularReturnType: string
+  cellularJitter: number
+  // Domain Warp
+  domainWarpType: string
+  domainWarpAmp: number
+  // Domain Warp Fractal
+  domainWarpFractalType: string
+  domainWarpFractalOctaves: number
+  domainWarpFractalLacunarity: number
+  domainWarpFractalGain: number
+}
+
 interface ChunkProps {
   size?: number // Size of the chunk (default 32)
   isolevel?: number // Isolevel threshold for showing/hiding cubes
   amplitude?: number // How much height variation (default 8)
   verticalOffset?: number // Where the baseline terrain sits (default 8)
+  noiseSettings?: NoiseSettings // FastNoise Lite settings
 }
 
 function Cube({ position }: { position: [number, number, number] }) {
@@ -17,29 +45,29 @@ function Cube({ position }: { position: [number, number, number] }) {
   )
 }
 
-export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8 }: ChunkProps) {
+export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings }: ChunkProps) {
   // Generate cube positions based on 2D noise and isolevel
   const cubePositions = useMemo(() => {
     const positions: [number, number, number][] = []
     
-    // Create noise function with fixed seed for consistency
-    const noise2D = makeNoise2D(12345) // Fixed seed so terrain stays consistent
+    // Create noise function with settings seed
+    const noise2D = makeNoise2D(noiseSettings?.seed || 12345)
     
     // Noise parameters
-    const noiseScale = 0.1 // How zoomed in the noise is
+    const noiseFrequency = noiseSettings?.frequency || 0.01 // Use settings frequency
     const heightMultiplier = amplitude // How tall the terrain can be (controlled by amplitude)
     const baseHeight = verticalOffset // Base terrain height (controlled by verticalOffset)
     
     for (let x = 0; x < size; x++) {
       for (let z = 0; z < size; z++) {
         // Generate height using 2D noise
-        const noiseValue = noise2D(x * noiseScale, z * noiseScale)
+        const noiseValue = noise2D(x * noiseFrequency, z * noiseFrequency)
         const height = Math.floor(baseHeight + (noiseValue * heightMultiplier))
         
         // Generate cubes from bottom up to the height, but only if above isolevel
         for (let y = 0; y <= height && y < size; y++) {
           // Create a secondary noise value for isolevel comparison
-          const isoNoiseValue = noise2D((x + 1000) * noiseScale, (z + 1000) * noiseScale)
+          const isoNoiseValue = noise2D((x + 1000) * noiseFrequency, (z + 1000) * noiseFrequency)
           
           // Only show cube if noise value is above isolevel
           if (isoNoiseValue > isolevel) {
@@ -55,7 +83,7 @@ export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset
     }
     
     return positions
-  }, [size, isolevel, amplitude, verticalOffset])
+  }, [size, isolevel, amplitude, verticalOffset, noiseSettings])
 
   return (
     <group>

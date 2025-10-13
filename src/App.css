@@ -6,3 +6,43 @@
   padding: 0;
   overflow: hidden;
 }
+
+/* Custom scrollbar styling to match Leva controls */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #181c20; /* Dark background matching Leva */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #3c4043; /* Subtle gray for the thumb */
+  border-radius: 4px;
+  border: 1px solid #2a2d30;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #4a4d50; /* Slightly lighter on hover */
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: #5a5d60; /* Even lighter when clicked */
+}
+
+::-webkit-scrollbar-corner {
+  background: #181c20;
+}
+
+/* Firefox scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #3c4043 #181c20;
+}
+
+/* Reset Leva panel to default width */
+[data-leva-root] {
+  width: 300px !important; /* Default Leva width + 20px for text visibility */
+}
