@@ -4,6 +4,8 @@ import { makeNoise2D } from 'open-simplex-noise'
 interface ChunkProps {
   size?: number // Size of the chunk (default 32)
   isolevel?: number // Isolevel threshold for showing/hiding cubes
+  amplitude?: number // How much height variation (default 8)
+  verticalOffset?: number // Where the baseline terrain sits (default 8)
 }
 
 function Cube({ position }: { position: [number, number, number] }) {
@@ -15,7 +17,7 @@ function Cube({ position }: { position: [number, number, number] }) {
   )
 }
 
-export function Chunk({ size = 32, isolevel = 0.0 }: ChunkProps) {
+export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8 }: ChunkProps) {
   // Generate cube positions based on 2D noise and isolevel
   const cubePositions = useMemo(() => {
     const positions: [number, number, number][] = []
@@ -25,8 +27,8 @@ export function Chunk({ size = 32, isolevel = 0.0 }: ChunkProps) {
     
     // Noise parameters
     const noiseScale = 0.1 // How zoomed in the noise is
-    const heightMultiplier = 8 // How tall the terrain can be
-    const baseHeight = size / 4 // Base terrain height
+    const heightMultiplier = amplitude // How tall the terrain can be (controlled by amplitude)
+    const baseHeight = verticalOffset // Base terrain height (controlled by verticalOffset)
     
     for (let x = 0; x < size; x++) {
       for (let z = 0; z < size; z++) {
@@ -53,7 +55,7 @@ export function Chunk({ size = 32, isolevel = 0.0 }: ChunkProps) {
     }
     
     return positions
-  }, [size, isolevel])
+  }, [size, isolevel, amplitude, verticalOffset])
 
   return (
     <group>
