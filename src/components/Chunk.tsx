@@ -1,7 +1,8 @@
 import { useMemo } from 'react'
+import { makeNoise2D } from 'open-simplex-noise'
 
 interface ChunkProps {
-  size?: number // Size of the chunk (default 4 for testing, will be 32 later)
+  size?: number // Size of the chunk (default 16 for testing, will be 32 later)
 }
 
 function Cube({ position }: { position: [number, number, number] }) {
@@ -13,14 +14,27 @@ function Cube({ position }: { position: [number, number, number] }) {
   )
 }
 
-export function Chunk({ size = 4 }: ChunkProps) {
-  // Generate all cube positions
+export function Chunk({ size = 32 }: ChunkProps) {
+  // Generate cube positions based on 2D noise
   const cubePositions = useMemo(() => {
     const positions: [number, number, number][] = []
     
+    // Create noise function
+    const noise2D = makeNoise2D(Date.now()) // Random seed
+    
+    // Noise parameters
+    const noiseScale = 0.1 // How zoomed in the noise is
+    const heightMultiplier = 8 // How tall the terrain can be
+    const baseHeight = size / 4 // Base terrain height
+    
     for (let x = 0; x < size; x++) {
-      for (let y = 0; y < size; y++) {
-        for (let z = 0; z < size; z++) {
+      for (let z = 0; z < size; z++) {
+        // Generate height using 2D noise
+        const noiseValue = noise2D(x * noiseScale, z * noiseScale)
+        const height = Math.floor(baseHeight + (noiseValue * heightMultiplier))
+        
+        // Generate cubes from bottom up to the height
+        for (let y = 0; y <= height && y < size; y++) {
           // Center the chunk around origin
           const centeredX = x - size / 2 + 0.5
           const centeredY = y - size / 2 + 0.5
