@@ -13,7 +13,7 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
-  const [position, setPosition] = useState({ x: 350, y: 20 }) // Start next to settings panel
+  const [position, setPosition] = useState({ x: 20, y: 20 }) // Start in top left corner
   const dragOffset = useRef({ x: 0, y: 0 })
 
   // Generate noise texture
@@ -24,8 +24,8 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const width = 256
-    const height = 256
+    const width = 128  // Reduced from 256 for better performance
+    const height = 128
     canvas.width = width
     canvas.height = height
 

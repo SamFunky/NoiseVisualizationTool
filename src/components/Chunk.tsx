@@ -1,5 +1,6 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useEffect } from 'react'
 import { makeNoise2D } from 'open-simplex-noise'
+import { InstancedMesh, Object3D } from 'three'
 
 export interface NoiseSettings {
   // General
@@ -29,7 +30,9 @@ export interface NoiseSettings {
 }
 
 interface ChunkProps {
-  size?: number // Size of the chunk (default 32)
+  sizeX?: number // X dimension of the chunk (default 32)
+  sizeY?: number // Y dimension of the chunk (default 32)
+  sizeZ?: number // Z dimension of the chunk (default 32)
   isolevel?: number // Isolevel threshold for showing/hiding cubes
   amplitude?: number // How much height variation (default 8)
   verticalOffset?: number // Where the baseline terrain sits (default 8)
@@ -37,16 +40,8 @@ interface ChunkProps {
   updateTrigger?: number // Trigger value to force updates when auto-update is off
 }
 
-function Cube({ position }: { position: [number, number, number] }) {
-  return (
-    <mesh position={position}>
-      <boxGeometry args={[1.0, 1.0, 1.0]} /> {/* Full size cubes touching each other */}
-      <meshLambertMaterial color="#9c9c9cff" /> {/* Stone gray color */}
-    </mesh>
-  )
-}
-
-export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger }: ChunkProps) {
+export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger }: ChunkProps) {
+  const meshRef = useRef<InstancedMesh>(null)
   // Generate cube positions based on 2D noise and isolevel
   const cubePositions = useMemo(() => {
     const positions: [number, number, number][] = []
@@ -59,23 +54,34 @@ export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset
     const heightMultiplier = amplitude // How tall the terrain can be (controlled by amplitude)
     const baseHeight = verticalOffset // Base terrain height (controlled by verticalOffset)
     
-    for (let x = 0; x < size; x++) {
-      for (let z = 0; z < size; z++) {
-        // Generate height using 2D noise
-        const noiseValue = noise2D(x * noiseFrequency, z * noiseFrequency)
+    // Pre-calculate noise values for better performance
+    const noiseMap = new Array(sizeX * sizeZ)
+    const isoNoiseMap = new Array(sizeX * sizeZ)
+    
+    for (let x = 0; x < sizeX; x++) {
+      for (let z = 0; z < sizeZ; z++) {
+        const index = x * sizeZ + z
+        noiseMap[index] = noise2D(x * noiseFrequency, z * noiseFrequency)
+        isoNoiseMap[index] = noise2D((x + 1000) * noiseFrequency, (z + 1000) * noiseFrequency)
+      }
+    }
+    
+    for (let x = 0; x < sizeX; x++) {
+      for (let z = 0; z < sizeZ; z++) {
+        const index = x * sizeZ + z
+        const noiseValue = noiseMap[index]
         const height = Math.floor(baseHeight + (noiseValue * heightMultiplier))
         
         // Generate cubes from bottom up to the height, but only if above isolevel
-        for (let y = 0; y <= height && y < size; y++) {
-          // Create a secondary noise value for isolevel comparison
-          const isoNoiseValue = noise2D((x + 1000) * noiseFrequency, (z + 1000) * noiseFrequency)
+        for (let y = 0; y <= height && y < sizeY; y++) {
+          const isoNoiseValue = isoNoiseMap[index]
           
           // Only show cube if noise value is above isolevel
           if (isoNoiseValue > isolevel) {
             // Center the chunk around origin
-            const centeredX = x - size / 2 + 0.5
-            const centeredY = y - size / 2 + 0.5
-            const centeredZ = z - size / 2 + 0.5
+            const centeredX = x - sizeX / 2 + 0.5
+            const centeredY = y - sizeY / 2 + 0.5
+            const centeredZ = z - sizeZ / 2 + 0.5
             
             positions.push([centeredX, centeredY, centeredZ])
           }
@@ -84,13 +90,45 @@ export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset
     }
     
     return positions
-  }, [size, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger])
+  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger])
+
+  // Update instanced mesh positions
+  useEffect(() => {
+    if (!meshRef.current) return
+    
+    const dummy = new Object3D()
+    
+    cubePositions.forEach((position, i) => {
+      dummy.position.set(...position)
+      dummy.updateMatrix()
+      meshRef.current!.setMatrixAt(i, dummy.matrix)
+    })
+    
+    meshRef.current.instanceMatrix.needsUpdate = true
+    meshRef.current.count = cubePositions.length
+    
+    // Fix frustum culling by manually setting bounding sphere
+    // Calculate the maximum extent of the chunk
+    const maxExtent = Math.max(sizeX, sizeY, sizeZ) / 2
+    const center = [0, 0, 0] // Centered around origin
+    const radius = maxExtent * Math.sqrt(3) * 1.1 // Diagonal distance with some padding
+    
+    if (meshRef.current.geometry.boundingSphere) {
+      meshRef.current.geometry.boundingSphere.center.set(center[0], center[1], center[2])
+      meshRef.current.geometry.boundingSphere.radius = radius
+    }
+    
+    // Disable automatic frustum culling to prevent disappearing
+    meshRef.current.frustumCulled = false
+  }, [cubePositions, sizeX, sizeY, sizeZ])
+
+  // Calculate max possible cubes for buffer allocation
+  const maxCubes = sizeX * sizeY * sizeZ
 
   return (
-    <group>
-      {cubePositions.map((position, index) => (
-        <Cube key={index} position={position} />
-      ))}
-    </group>
+    <instancedMesh ref={meshRef} args={[undefined, undefined, maxCubes]}>
+      <boxGeometry args={[1.0, 1.0, 1.0]} />
+      <meshLambertMaterial color="#9c9c9cff" />
+    </instancedMesh>
   )
 }

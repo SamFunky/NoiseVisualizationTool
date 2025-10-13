@@ -1,23 +1,27 @@
 import { Line } from '@react-three/drei'
 
 interface ChunkFrameProps {
-  size: number
+  sizeX: number
+  sizeY: number
+  sizeZ: number
 }
 
-export function ChunkFrame({ size }: ChunkFrameProps) {
+export function ChunkFrame({ sizeX, sizeY, sizeZ }: ChunkFrameProps) {
   // Calculate the bounds of the chunk
-  const halfSize = size / 2
+  const halfX = sizeX / 2
+  const halfY = sizeY / 2
+  const halfZ = sizeZ / 2
 
   // Define the 8 corners of the cube as typed tuples
   const corners: [number, number, number][] = [
-    [-halfSize, -halfSize, -halfSize], // bottom front left
-    [halfSize, -halfSize, -halfSize],  // bottom front right
-    [halfSize, halfSize, -halfSize],   // top front right
-    [-halfSize, halfSize, -halfSize],  // top front left
-    [-halfSize, -halfSize, halfSize],  // bottom back left
-    [halfSize, -halfSize, halfSize],   // bottom back right
-    [halfSize, halfSize, halfSize],    // top back right
-    [-halfSize, halfSize, halfSize],   // top back left
+    [-halfX, -halfY, -halfZ], // bottom front left
+    [halfX, -halfY, -halfZ],  // bottom front right
+    [halfX, halfY, -halfZ],   // top front right
+    [-halfX, halfY, -halfZ],  // top front left
+    [-halfX, -halfY, halfZ],  // bottom back left
+    [halfX, -halfY, halfZ],   // bottom back right
+    [halfX, halfY, halfZ],    // top back right
+    [-halfX, halfY, halfZ],   // top back left
   ]
 
   // Define the 12 edges of the cube

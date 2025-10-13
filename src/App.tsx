@@ -1,10 +1,11 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { useControls } from 'leva'
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { Chunk } from './components/Chunk'
 import { ChunkFrame } from './components/ChunkFrame'
 import { NoisePreview } from './components/NoisePreview'
+import { ChunkSizeControls } from './components/ChunkSizeControls'
 import './App.css'
 
 function App() {
@@ -12,19 +13,28 @@ function App() {
   const [autoUpdate, setAutoUpdate] = useState(true)
   const [manualUpdateTrigger, setManualUpdateTrigger] = useState(0)
   
+  // State for chunk dimensions
+  const [chunkSize, setChunkSize] = useState({ x: 32, y: 32, z: 32 })
+  
   // Snapshot values when auto-update is turned off or manual update button is clicked
   const [frozenValues, setFrozenValues] = useState({
     isolevel: -1.0,
     amplitude: 8,
-    verticalOffset: 8,
+    verticalOffsetPercent: 25,
     noiseSettings: {} as any
   })
+
+  // Calculate frozen vertical offset based on percentage
+  const frozenVerticalOffset = Math.floor((frozenValues.verticalOffsetPercent / 100) * chunkSize.y)
   // Leva controls for terrain parameters
-  const { isolevel, amplitude, verticalOffset } = useControls('Terrain', {
+  const { isolevel, amplitude, verticalOffsetPercent } = useControls('Terrain', {
     isolevel: { value: -1.0, min: -1.0, max: 1.0, step: 0.05 },
     amplitude: 8,
-    verticalOffset: { value: 8, min: 0, max: 32, step: 1 }
+    verticalOffsetPercent: { value: 25, min: 0, max: 100, step: 5, label: 'vertical offset %' }
   })
+
+  // Calculate actual vertical offset based on percentage of chunk height
+  const verticalOffset = Math.floor((verticalOffsetPercent / 100) * chunkSize.y)
 
   // General noise settings
   const generalSettings = useControls('General', {
@@ -118,9 +128,18 @@ function App() {
     <div className="app">
       <Canvas
         camera={{
-          position: [10, 10, 10], // Isometric-style position
-          fov: 75
+          position: [
+            chunkSize.x * 1.2, 
+            chunkSize.y * 1.0, 
+            chunkSize.z * 1.2
+          ], // Dynamic camera position based on chunk size
+          fov: 60
         }}
+        gl={{ 
+          antialias: false, // Disable antialiasing for better performance
+          powerPreference: "high-performance" // Use dedicated GPU if available
+        }}
+        dpr={[1, 2]} // Limit device pixel ratio for performance
       >
         {/* Basic lighting */}
         <ambientLight intensity={0.5} />
@@ -128,19 +147,29 @@ function App() {
         
         {/* Our chunk of cubes */}
         <Chunk 
-          size={32} 
+          sizeX={chunkSize.x}
+          sizeY={chunkSize.y}
+          sizeZ={chunkSize.z}
           isolevel={autoUpdate ? isolevel : frozenValues.isolevel} 
           amplitude={autoUpdate ? amplitude : frozenValues.amplitude} 
-          verticalOffset={autoUpdate ? verticalOffset : frozenValues.verticalOffset}
+          verticalOffset={autoUpdate ? verticalOffset : frozenVerticalOffset}
           noiseSettings={autoUpdate ? noiseSettings : frozenValues.noiseSettings}
           updateTrigger={manualUpdateTrigger}
         />
         
         {/* Wireframe showing chunk boundaries */}
-        <ChunkFrame size={32} />
+        <ChunkFrame 
+          sizeX={chunkSize.x}
+          sizeY={chunkSize.y}
+          sizeZ={chunkSize.z}
+        />
         
-        {/* Camera controls */}
-        <OrbitControls />
+        {/* Camera controls - center on chunk */}
+        <OrbitControls 
+          target={[0, 0, 0]}
+          enableDamping={true}
+          dampingFactor={0.05}
+        />
       </Canvas>
       
       {/* Draggable noise preview */}
@@ -150,15 +179,18 @@ function App() {
         onAutoUpdateChange={(value) => {
           if (!value) {
             // Freeze current values when turning auto-update off
-            setFrozenValues({ isolevel, amplitude, verticalOffset, noiseSettings })
+            setFrozenValues({ isolevel, amplitude, verticalOffsetPercent, noiseSettings })
           }
           setAutoUpdate(value)
         }}
         onManualUpdate={() => {
-          setFrozenValues({ isolevel, amplitude, verticalOffset, noiseSettings })
+          setFrozenValues({ isolevel, amplitude, verticalOffsetPercent, noiseSettings })
           setManualUpdateTrigger(prev => prev + 1)
         }}
       />
+      
+      {/* Chunk size controls at bottom */}
+      <ChunkSizeControls onSizeChange={setChunkSize} />
     </div>
   )
 }
