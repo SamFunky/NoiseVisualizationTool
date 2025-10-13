@@ -34,6 +34,7 @@ interface ChunkProps {
   amplitude?: number // How much height variation (default 8)
   verticalOffset?: number // Where the baseline terrain sits (default 8)
   noiseSettings?: NoiseSettings // FastNoise Lite settings
+  updateTrigger?: number // Trigger value to force updates when auto-update is off
 }
 
 function Cube({ position }: { position: [number, number, number] }) {
@@ -45,7 +46,7 @@ function Cube({ position }: { position: [number, number, number] }) {
   )
 }
 
-export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings }: ChunkProps) {
+export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger }: ChunkProps) {
   // Generate cube positions based on 2D noise and isolevel
   const cubePositions = useMemo(() => {
     const positions: [number, number, number][] = []
@@ -83,7 +84,7 @@ export function Chunk({ size = 32, isolevel = 0.0, amplitude = 8, verticalOffset
     }
     
     return positions
-  }, [size, isolevel, amplitude, verticalOffset, noiseSettings])
+  }, [size, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger])
 
   return (
     <group>

@@ -4,9 +4,12 @@ import type { NoiseSettings } from './Chunk'
 
 interface NoisePreviewProps {
   noiseSettings: NoiseSettings
+  autoUpdate: boolean
+  onAutoUpdateChange: (value: boolean) => void
+  onManualUpdate: () => void
 }
 
-export function NoisePreview({ noiseSettings }: NoisePreviewProps) {
+export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, onManualUpdate }: NoisePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -59,8 +62,15 @@ export function NoisePreview({ noiseSettings }: NoisePreviewProps) {
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!containerRef.current) return
     
-    setIsDragging(true)
+    // Only allow dragging from the header area, not the canvas
     const rect = containerRef.current.getBoundingClientRect()
+    const clickY = e.clientY - rect.top
+    
+    // Only drag if clicking in the header area (first 30px)
+    if (clickY > 30) return
+    
+    e.preventDefault()
+    setIsDragging(true)
     dragOffset.current = {
       x: e.clientX - rect.left,
       y: e.clientY - rect.top
@@ -105,7 +115,7 @@ export function NoisePreview({ noiseSettings }: NoisePreviewProps) {
         borderRadius: '8px',
         padding: '12px',
         zIndex: 1000,
-        cursor: isDragging ? 'grabbing' : 'grab',
+        cursor: 'default',
         fontFamily: 'system-ui, sans-serif',
         color: '#ffffff',
         fontSize: '12px',
@@ -117,9 +127,11 @@ export function NoisePreview({ noiseSettings }: NoisePreviewProps) {
         marginBottom: '8px', 
         fontWeight: 'bold',
         borderBottom: '1px solid #3c4043',
-        paddingBottom: '6px'
+        paddingBottom: '6px',
+        cursor: 'move',
+        userSelect: 'none'
       }}>
-        Noise Preview
+        🔧 Noise Preview
       </div>
       
       <div style={{
@@ -143,10 +155,59 @@ export function NoisePreview({ noiseSettings }: NoisePreviewProps) {
       <div style={{
         fontSize: '10px',
         color: '#888',
-        textAlign: 'center'
+        textAlign: 'center',
+        marginBottom: '8px'
       }}>
         32×32 raw noise pattern<br/>
         White: High | Black: Low
+      </div>
+      
+      {/* Update Controls */}
+      <div style={{
+        borderTop: '1px solid #3c4043',
+        paddingTop: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: '8px'
+      }}>
+        <label style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '6px',
+          fontSize: '11px',
+          cursor: 'pointer',
+          userSelect: 'none'
+        }}>
+          <input
+            type="checkbox"
+            checked={autoUpdate}
+            onChange={(e) => onAutoUpdateChange(e.target.checked)}
+            style={{
+              width: '12px',
+              height: '12px',
+              accentColor: '#4CAF50'
+            }}
+          />
+          Auto Update
+        </label>
+        
+        <button
+          onClick={onManualUpdate}
+          disabled={autoUpdate}
+          style={{
+            padding: '4px 8px',
+            fontSize: '10px',
+            backgroundColor: autoUpdate ? '#2a2d30' : '#4CAF50',
+            color: autoUpdate ? '#666' : '#ffffff',
+            border: '1px solid #3c4043',
+            borderRadius: '3px',
+            cursor: autoUpdate ? 'not-allowed' : 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Update 3D
+        </button>
       </div>
     </div>
   )

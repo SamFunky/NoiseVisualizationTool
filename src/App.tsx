@@ -1,17 +1,29 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { useControls } from 'leva'
+import { useState, useMemo } from 'react'
 import { Chunk } from './components/Chunk'
 import { ChunkFrame } from './components/ChunkFrame'
 import { NoisePreview } from './components/NoisePreview'
 import './App.css'
 
 function App() {
+  // State for controlling when to update the 3D terrain
+  const [autoUpdate, setAutoUpdate] = useState(true)
+  const [manualUpdateTrigger, setManualUpdateTrigger] = useState(0)
+  
+  // Snapshot values when auto-update is turned off or manual update button is clicked
+  const [frozenValues, setFrozenValues] = useState({
+    isolevel: -1.0,
+    amplitude: 8,
+    verticalOffset: 8,
+    noiseSettings: {} as any
+  })
   // Leva controls for terrain parameters
   const { isolevel, amplitude, verticalOffset } = useControls('Terrain', {
     isolevel: { value: -1.0, min: -1.0, max: 1.0, step: 0.05 },
-    amplitude: { value: 8, min: 1, max: 100, step: 1 },
-    verticalOffset: { value: 8, min: 0, max: 24, step: 1 }
+    amplitude: 8,
+    verticalOffset: { value: 8, min: 0, max: 32, step: 1 }
   })
 
   // General noise settings
@@ -24,8 +36,8 @@ function App() {
       value: 'None', 
       options: ['None', 'ImproveXYPlanes', 'ImproveXZPlanes']
     },
-    seed: { value: 1337, min: 0, max: 9999, step: 1 },
-    frequency: { value: 0.01, min: 0.001, max: 0.1, step: 0.001 }
+    seed: 1337,
+    frequency: 0.01
   })
 
   // Fractal settings
@@ -34,9 +46,9 @@ function App() {
       value: 'None', 
       options: ['None', 'FBm', 'Ridged', 'PingPong', 'DomainWarpProgressive', 'DomainWarpIndependent']
     },
-    octaves: { value: 3, min: 1, max: 10, step: 1 },
+    octaves: { value: 3, min: 1, max: 16, step: 1 },
     lacunarity: { value: 2.0, min: 0.1, max: 4.0, step: 0.1 },
-    gain: { value: 0.5, min: 0.0, max: 1.0, step: 0.1 },
+    gain: { value: 0.5, min: 0.0, max: 1.0, step: 0.01 },
     weightedStrength: { value: 0.0, min: -2.0, max: 2.0, step: 0.1 },
     pingPongStrength: { value: 2.0, min: 0.0, max: 10.0, step: 0.1 }
   })
@@ -51,7 +63,7 @@ function App() {
       value: 'Distance', 
       options: ['CellValue', 'Distance', 'Distance2', 'Distance2Add', 'Distance2Sub', 'Distance2Mul', 'Distance2Div']
     },
-    jitter: { value: 1.0, min: 0.0, max: 2.0, step: 0.1 }
+    jitter: { value: 1.0, min: 0.0, max: 2.0, step: 0.05 }
   })
 
   // Domain Warp settings
@@ -69,9 +81,9 @@ function App() {
       value: 'None', 
       options: ['None', 'Progressive', 'Independent']
     },
-    octaves: { value: 3, min: 1, max: 10, step: 1 },
+    octaves: { value: 3, min: 1, max: 16, step: 1 },
     lacunarity: { value: 2.0, min: 0.1, max: 4.0, step: 0.1 },
-    gain: { value: 0.5, min: 0.0, max: 1.0, step: 0.1 }
+    gain: { value: 0.5, min: 0.0, max: 1.0, step: 0.01 }
   })
 
   // Combine all noise settings with proper mapping
@@ -117,10 +129,11 @@ function App() {
         {/* Our chunk of cubes */}
         <Chunk 
           size={32} 
-          isolevel={isolevel} 
-          amplitude={amplitude} 
-          verticalOffset={verticalOffset}
-          noiseSettings={noiseSettings}
+          isolevel={autoUpdate ? isolevel : frozenValues.isolevel} 
+          amplitude={autoUpdate ? amplitude : frozenValues.amplitude} 
+          verticalOffset={autoUpdate ? verticalOffset : frozenValues.verticalOffset}
+          noiseSettings={autoUpdate ? noiseSettings : frozenValues.noiseSettings}
+          updateTrigger={manualUpdateTrigger}
         />
         
         {/* Wireframe showing chunk boundaries */}
@@ -133,6 +146,18 @@ function App() {
       {/* Draggable noise preview */}
       <NoisePreview 
         noiseSettings={noiseSettings}
+        autoUpdate={autoUpdate}
+        onAutoUpdateChange={(value) => {
+          if (!value) {
+            // Freeze current values when turning auto-update off
+            setFrozenValues({ isolevel, amplitude, verticalOffset, noiseSettings })
+          }
+          setAutoUpdate(value)
+        }}
+        onManualUpdate={() => {
+          setFrozenValues({ isolevel, amplitude, verticalOffset, noiseSettings })
+          setManualUpdateTrigger(prev => prev + 1)
+        }}
       />
     </div>
   )

@@ -46,3 +46,13 @@
 [data-leva-root] {
   width: 300px !important; /* Default Leva width + 20px for text visibility */
 }
+
+/* Hide Leva collapse arrows */
+[data-leva-root] button[data-leva-icon] {
+  display: none !important;
+}
+
+/* Adjust folder header padding since arrows are hidden */
+[data-leva-root] [data-leva-folder] > div:first-child {
+  padding-left: 12px !important;
+}
