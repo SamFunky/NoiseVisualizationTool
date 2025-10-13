@@ -2,7 +2,8 @@ import { useMemo } from 'react'
 import { makeNoise2D } from 'open-simplex-noise'
 
 interface ChunkProps {
-  size?: number // Size of the chunk (default 16 for testing, will be 32 later)
+  size?: number // Size of the chunk (default 32)
+  isolevel?: number // Isolevel threshold for showing/hiding cubes
 }
 
 function Cube({ position }: { position: [number, number, number] }) {
@@ -14,13 +15,13 @@ function Cube({ position }: { position: [number, number, number] }) {
   )
 }
 
-export function Chunk({ size = 32 }: ChunkProps) {
-  // Generate cube positions based on 2D noise
+export function Chunk({ size = 32, isolevel = 0.0 }: ChunkProps) {
+  // Generate cube positions based on 2D noise and isolevel
   const cubePositions = useMemo(() => {
     const positions: [number, number, number][] = []
     
-    // Create noise function
-    const noise2D = makeNoise2D(Date.now()) // Random seed
+    // Create noise function with fixed seed for consistency
+    const noise2D = makeNoise2D(12345) // Fixed seed so terrain stays consistent
     
     // Noise parameters
     const noiseScale = 0.1 // How zoomed in the noise is
@@ -33,20 +34,26 @@ export function Chunk({ size = 32 }: ChunkProps) {
         const noiseValue = noise2D(x * noiseScale, z * noiseScale)
         const height = Math.floor(baseHeight + (noiseValue * heightMultiplier))
         
-        // Generate cubes from bottom up to the height
+        // Generate cubes from bottom up to the height, but only if above isolevel
         for (let y = 0; y <= height && y < size; y++) {
-          // Center the chunk around origin
-          const centeredX = x - size / 2 + 0.5
-          const centeredY = y - size / 2 + 0.5
-          const centeredZ = z - size / 2 + 0.5
+          // Create a secondary noise value for isolevel comparison
+          const isoNoiseValue = noise2D((x + 1000) * noiseScale, (z + 1000) * noiseScale)
           
-          positions.push([centeredX, centeredY, centeredZ])
+          // Only show cube if noise value is above isolevel
+          if (isoNoiseValue > isolevel) {
+            // Center the chunk around origin
+            const centeredX = x - size / 2 + 0.5
+            const centeredY = y - size / 2 + 0.5
+            const centeredZ = z - size / 2 + 0.5
+            
+            positions.push([centeredX, centeredY, centeredZ])
+          }
         }
       }
     }
     
     return positions
-  }, [size])
+  }, [size, isolevel])
 
   return (
     <group>
