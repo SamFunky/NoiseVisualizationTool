@@ -6,6 +6,7 @@ import { Chunk } from './components/Chunk'
 import { ChunkFrame } from './components/ChunkFrame'
 import { NoisePreview } from './components/NoisePreview'
 import { ChunkSizeControls } from './components/ChunkSizeControls'
+import { CloudSky } from './components/CloudSky'
 import './App.css'
 
 function App() {
@@ -145,6 +146,9 @@ function App() {
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
         
+        {/* Cloud skybox - always renders behind terrain */}
+        <CloudSky cloudCount={25} radius={1000} />
+        
         {/* Our chunk of cubes */}
         <Chunk 
           sizeX={chunkSize.x}
@@ -169,6 +173,8 @@ function App() {
           target={[0, 0, 0]}
           enableDamping={true}
           dampingFactor={0.05}
+          minDistance={10}
+          maxDistance={300}
         />
       </Canvas>
       
