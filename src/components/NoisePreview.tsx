@@ -17,6 +17,7 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
   const [position, setPosition] = useState({ x: 20, y: 20 }) // Start in top left corner
   const [is3D, setIs3D] = useState(false) // Toggle between 2D and 3D noise for chunk generation
   const [zoomLevel, setZoomLevel] = useState(1.0) // Zoom level for noise preview (1.0 = normal, higher = more zoomed in)
+  const [isSmooth, setIsSmooth] = useState(false) // Toggle between blocky and smooth rendering
   const dragOffset = useRef({ x: 0, y: 0 })
 
   // Generate noise texture - always show 2D preview
@@ -320,30 +321,83 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
           </button>
         </div>
         
-        <label style={{
+        <div style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '6px',
-          fontSize: '11px',
-          cursor: 'pointer',
-          userSelect: 'none'
+          justifyContent: 'center',
+          gap: '8px',
+          fontSize: '11px'
         }}>
-          <input
-            type="checkbox"
-            checked={is3D}
-            onChange={(e) => {
-              const newIs3D = e.target.checked
+          <span style={{ color: '#ccc', fontSize: '10px' }}>2D</span>
+          <div 
+            onClick={() => {
+              const newIs3D = !is3D
               setIs3D(newIs3D)
               on3DModeChange(newIs3D)
             }}
             style={{
-              width: '12px',
-              height: '12px',
-              accentColor: '#4CAF50'
+              position: 'relative',
+              width: '44px',
+              height: '20px',
+              backgroundColor: is3D ? '#4CAF50' : '#3c4043',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+              border: '1px solid #2a2d30'
             }}
-          />
-          Use 3D Noise for Terrain
-        </label>
+          >
+            <div style={{
+              position: 'absolute',
+              top: '1px',
+              left: is3D ? '23px' : '1px',
+              width: '18px',
+              height: '18px',
+              backgroundColor: '#ffffff',
+              borderRadius: '50%',
+              transition: 'left 0.2s ease',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
+            }} />
+          </div>
+          <span style={{ color: '#ccc', fontSize: '10px' }}>3D</span>
+        </div>
+        
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '8px',
+          fontSize: '11px'
+        }}>
+          <span style={{ color: '#ccc', fontSize: '10px', width: '35px', textAlign: 'right' }}>Blocky</span>
+          <div 
+            onClick={() => {
+              setIsSmooth(!isSmooth)
+            }}
+            style={{
+              position: 'relative',
+              width: '44px',
+              height: '20px',
+              backgroundColor: isSmooth ? '#4CAF50' : '#3c4043',
+              borderRadius: '10px',
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease',
+              border: '1px solid #2a2d30'
+            }}
+          >
+            <div style={{
+              position: 'absolute',
+              top: '1px',
+              left: isSmooth ? '24px' : '2px',
+              width: '18px',
+              height: '18px',
+              backgroundColor: '#ffffff',
+              borderRadius: '50%',
+              transition: 'left 0.2s ease',
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.3)'
+            }} />
+          </div>
+          <span style={{ color: '#ccc', fontSize: '10px', width: '35px', textAlign: 'left' }}>Smooth</span>
+        </div>
       </div>
     </div>
   )
