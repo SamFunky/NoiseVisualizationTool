@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect } from 'react'
-import { makeNoise2D, makeNoise3D } from 'open-simplex-noise'
+import FastNoiseLite from 'fastnoise-lite'
 import { InstancedMesh, Object3D } from 'three'
 
 export interface NoiseSettings {
@@ -43,24 +43,73 @@ interface ChunkProps {
 
 export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger, use3D = false }: ChunkProps) {
   const meshRef = useRef<InstancedMesh>(null)
+  
+  // Helper function to configure FastNoiseLite based on settings
+  const createNoiseGenerator = () => {
+    const fastNoise = new FastNoiseLite()
+    fastNoise.SetSeed(noiseSettings?.seed || 12345)
+    fastNoise.SetFrequency(noiseSettings?.frequency || 0.01)
+    
+    // Configure noise type based on settings
+    switch (noiseSettings?.noiseType) {
+      case 'perlin':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.Perlin)
+        break
+      case 'opensimplex2':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2)
+        break
+      case 'opensimplex2s':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2S)
+        break
+      case 'cellular':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.Cellular)
+        fastNoise.SetCellularDistanceFunction(FastNoiseLite.CellularDistanceFunction.EuclideanSq)
+        fastNoise.SetCellularReturnType(FastNoiseLite.CellularReturnType.Distance)
+        break
+      case 'value_cubic':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.ValueCubic)
+        break
+      case 'value':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.Value)
+        break
+      default:
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2)
+    }
+
+    // Configure fractals if enabled
+    if (noiseSettings && noiseSettings.fractalOctaves > 1) {
+      fastNoise.SetFractalType(FastNoiseLite.FractalType.FBm)
+      fastNoise.SetFractalOctaves(noiseSettings.fractalOctaves)
+      fastNoise.SetFractalLacunarity(noiseSettings.fractalLacunarity)
+      fastNoise.SetFractalGain(noiseSettings.fractalGain)
+    }
+
+    // Configure domain warp if enabled
+    if (noiseSettings && noiseSettings.domainWarpAmp > 0) {
+      fastNoise.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2)
+      fastNoise.SetDomainWarpAmp(noiseSettings.domainWarpAmp)
+    }
+    
+    return fastNoise
+  }
+
   // Generate cube positions based on noise and isolevel
   const cubePositions = useMemo(() => {
     const positions: [number, number, number][] = []
     
     // Noise parameters
-    const noiseFrequency = noiseSettings?.frequency || 0.01 // Use settings frequency
     const heightMultiplier = amplitude // How tall the terrain can be (controlled by amplitude)
     const baseHeight = verticalOffset // Base terrain height (controlled by verticalOffset)
     
     if (use3D) {
       // Use 3D noise for true volumetric generation
-      const noise3D = makeNoise3D(noiseSettings?.seed || 12345)
+      const fastNoise = createNoiseGenerator()
       
       for (let x = 0; x < sizeX; x++) {
         for (let y = 0; y < sizeY; y++) {
           for (let z = 0; z < sizeZ; z++) {
             // Generate 3D noise value for this position
-            const noiseValue = noise3D(x * noiseFrequency, y * noiseFrequency, z * noiseFrequency)
+            const noiseValue = fastNoise.GetNoise(x, y, z)
             
             // Only show cube if noise value is above isolevel
             if (noiseValue > isolevel) {
@@ -76,7 +125,9 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
       }
     } else {
       // Use 2D noise for traditional height-based terrain
-      const noise2D = makeNoise2D(noiseSettings?.seed || 12345)
+      const fastNoise = createNoiseGenerator()
+      const isoNoise = createNoiseGenerator()
+      isoNoise.SetSeed((noiseSettings?.seed || 12345) + 1000) // Different seed for isolation
       
       // Pre-calculate noise values for better performance
       const noiseMap = new Array(sizeX * sizeZ)
@@ -85,8 +136,8 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
       for (let x = 0; x < sizeX; x++) {
         for (let z = 0; z < sizeZ; z++) {
           const index = x * sizeZ + z
-          noiseMap[index] = noise2D(x * noiseFrequency, z * noiseFrequency)
-          isoNoiseMap[index] = noise2D((x + 1000) * noiseFrequency, (z + 1000) * noiseFrequency)
+          noiseMap[index] = fastNoise.GetNoise(x, z)
+          isoNoiseMap[index] = isoNoise.GetNoise(x + 1000, z + 1000)
         }
       }
       

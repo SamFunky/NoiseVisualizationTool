@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react'
-import { makeNoise2D } from 'open-simplex-noise'
+import FastNoiseLite from 'fastnoise-lite'
 import type { NoiseSettings } from './Chunk'
 
 interface NoisePreviewProps {
@@ -16,6 +16,7 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
   const [isDragging, setIsDragging] = useState(false)
   const [position, setPosition] = useState({ x: 20, y: 20 }) // Start in top left corner
   const [is3D, setIs3D] = useState(false) // Toggle between 2D and 3D noise for chunk generation
+  const [zoomLevel, setZoomLevel] = useState(1.0) // Zoom level for noise preview (1.0 = normal, higher = more zoomed in)
   const dragOffset = useRef({ x: 0, y: 0 })
 
   // Generate noise texture - always show 2D preview
@@ -34,16 +35,61 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
     const imageData = ctx.createImageData(width, height)
     const data = imageData.data
 
-    // Always use 2D noise for preview visualization
-    const noise2D = makeNoise2D(noiseSettings.seed)
+    // Use FastNoiseLite for preview visualization
+    const fastNoise = new FastNoiseLite()
+    fastNoise.SetSeed(noiseSettings.seed)
+    fastNoise.SetFrequency(noiseSettings.frequency)
+    
+    // Configure noise type based on settings
+    switch (noiseSettings.noiseType) {
+      case 'perlin':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.Perlin)
+        break
+      case 'opensimplex2':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2)
+        break
+      case 'opensimplex2s':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2S)
+        break
+      case 'cellular':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.Cellular)
+        fastNoise.SetCellularDistanceFunction(FastNoiseLite.CellularDistanceFunction.EuclideanSq)
+        fastNoise.SetCellularReturnType(FastNoiseLite.CellularReturnType.Distance)
+        break
+      case 'value_cubic':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.ValueCubic)
+        break
+      case 'value':
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.Value)
+        break
+      default:
+        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2)
+    }
+
+    // Configure fractals if enabled
+    if (noiseSettings.fractalOctaves > 1) {
+      fastNoise.SetFractalType(FastNoiseLite.FractalType.FBm)
+      fastNoise.SetFractalOctaves(noiseSettings.fractalOctaves)
+      fastNoise.SetFractalLacunarity(noiseSettings.fractalLacunarity)
+      fastNoise.SetFractalGain(noiseSettings.fractalGain)
+    }
+
+    // Configure domain warp if enabled
+    if (noiseSettings.domainWarpAmp > 0) {
+      fastNoise.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2)
+      fastNoise.SetDomainWarpAmp(noiseSettings.domainWarpAmp)
+    }
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const nx = x / width * 32 // Scale to match chunk size
-        const nz = y / height * 32
+        // Apply zoom level to the coordinates - higher zoom = more detailed view
+        // Center the zoom by offsetting coordinates to zoom from the center
+        const centerOffset = 16 // Half of 32 (chunk size)
+        const nx = ((x / width * 32) - centerOffset) / zoomLevel + centerOffset
+        const nz = ((y / height * 32) - centerOffset) / zoomLevel + centerOffset
 
-        // Generate raw noise value (pure noise pattern)
-        const noiseValue = noise2D(nx * noiseSettings.frequency, nz * noiseSettings.frequency)
+        // Generate raw noise value
+        const noiseValue = fastNoise.GetNoise(nx, nz)
         
         // Convert raw noise (-1 to 1) directly to grayscale (0-255)
         // This shows the pure noise pattern without terrain modifications
@@ -58,7 +104,7 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
     }
 
     ctx.putImageData(imageData, 0, 0)
-  }, [noiseSettings])
+  }, [noiseSettings, zoomLevel])
 
   // Dragging functionality
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -165,9 +211,65 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
         White: High | Black: Low
       </div>
       
+      {/* Zoom Control */}
+      <div style={{
+        marginBottom: '8px',
+        paddingBottom: '8px',
+        borderBottom: '1px solid #3c4043'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '4px'
+        }}>
+          <label style={{
+            fontSize: '11px',
+            color: '#ccc',
+            fontWeight: 'bold'
+          }}>
+            Preview Zoom
+          </label>
+          <span style={{
+            fontSize: '10px',
+            color: '#888',
+            fontFamily: 'monospace'
+          }}>
+            {zoomLevel.toFixed(2)}x
+          </span>
+        </div>
+        <input
+          type="range"
+          min="0.01"
+          max="1.00"
+          step="0.01"
+          value={zoomLevel}
+          onChange={(e) => setZoomLevel(parseFloat(e.target.value))}
+          style={{
+            width: '100%',
+            height: '6px',
+            background: 'linear-gradient(to right, #4CAF50 0%, #4CAF50 ' + ((zoomLevel - 0.01) / 0.99 * 100) + '%, #3c4043 ' + ((zoomLevel - 0.01) / 0.99 * 100) + '%, #3c4043 100%)',
+            outline: 'none',
+            borderRadius: '3px',
+            appearance: 'none',
+            cursor: 'pointer',
+            border: '1px solid #2a2d30'
+          }}
+        />
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          fontSize: '9px',
+          color: '#666',
+          marginTop: '2px'
+        }}>
+          <span>0.01x</span>
+          <span>1.00x</span>
+        </div>
+      </div>
+      
       {/* Update Controls */}
       <div style={{
-        borderTop: '1px solid #3c4043',
         paddingTop: '8px',
         display: 'flex',
         flexDirection: 'column',
