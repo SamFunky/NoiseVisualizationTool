@@ -1,5 +1,5 @@
 import { useMemo, useRef, useEffect } from 'react'
-import { makeNoise2D } from 'open-simplex-noise'
+import { makeNoise2D, makeNoise3D } from 'open-simplex-noise'
 import { InstancedMesh, Object3D } from 'three'
 
 export interface NoiseSettings {
@@ -38,59 +38,84 @@ interface ChunkProps {
   verticalOffset?: number // Where the baseline terrain sits (default 8)
   noiseSettings?: NoiseSettings // FastNoise Lite settings
   updateTrigger?: number // Trigger value to force updates when auto-update is off
+  use3D?: boolean // Whether to use 3D noise or 2D noise
 }
 
-export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger }: ChunkProps) {
+export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger, use3D = false }: ChunkProps) {
   const meshRef = useRef<InstancedMesh>(null)
-  // Generate cube positions based on 2D noise and isolevel
+  // Generate cube positions based on noise and isolevel
   const cubePositions = useMemo(() => {
     const positions: [number, number, number][] = []
-    
-    // Create noise function with settings seed
-    const noise2D = makeNoise2D(noiseSettings?.seed || 12345)
     
     // Noise parameters
     const noiseFrequency = noiseSettings?.frequency || 0.01 // Use settings frequency
     const heightMultiplier = amplitude // How tall the terrain can be (controlled by amplitude)
     const baseHeight = verticalOffset // Base terrain height (controlled by verticalOffset)
     
-    // Pre-calculate noise values for better performance
-    const noiseMap = new Array(sizeX * sizeZ)
-    const isoNoiseMap = new Array(sizeX * sizeZ)
-    
-    for (let x = 0; x < sizeX; x++) {
-      for (let z = 0; z < sizeZ; z++) {
-        const index = x * sizeZ + z
-        noiseMap[index] = noise2D(x * noiseFrequency, z * noiseFrequency)
-        isoNoiseMap[index] = noise2D((x + 1000) * noiseFrequency, (z + 1000) * noiseFrequency)
-      }
-    }
-    
-    for (let x = 0; x < sizeX; x++) {
-      for (let z = 0; z < sizeZ; z++) {
-        const index = x * sizeZ + z
-        const noiseValue = noiseMap[index]
-        const height = Math.floor(baseHeight + (noiseValue * heightMultiplier))
-        
-        // Generate cubes from bottom up to the height, but only if above isolevel
-        for (let y = 0; y <= height && y < sizeY; y++) {
-          const isoNoiseValue = isoNoiseMap[index]
-          
-          // Only show cube if noise value is above isolevel
-          if (isoNoiseValue > isolevel) {
-            // Center the chunk around origin
-            const centeredX = x - sizeX / 2 + 0.5
-            const centeredY = y - sizeY / 2 + 0.5
-            const centeredZ = z - sizeZ / 2 + 0.5
+    if (use3D) {
+      // Use 3D noise for true volumetric generation
+      const noise3D = makeNoise3D(noiseSettings?.seed || 12345)
+      
+      for (let x = 0; x < sizeX; x++) {
+        for (let y = 0; y < sizeY; y++) {
+          for (let z = 0; z < sizeZ; z++) {
+            // Generate 3D noise value for this position
+            const noiseValue = noise3D(x * noiseFrequency, y * noiseFrequency, z * noiseFrequency)
             
-            positions.push([centeredX, centeredY, centeredZ])
+            // Only show cube if noise value is above isolevel
+            if (noiseValue > isolevel) {
+              // Center the chunk around origin
+              const centeredX = x - sizeX / 2 + 0.5
+              const centeredY = y - sizeY / 2 + 0.5
+              const centeredZ = z - sizeZ / 2 + 0.5
+              
+              positions.push([centeredX, centeredY, centeredZ])
+            }
+          }
+        }
+      }
+    } else {
+      // Use 2D noise for traditional height-based terrain
+      const noise2D = makeNoise2D(noiseSettings?.seed || 12345)
+      
+      // Pre-calculate noise values for better performance
+      const noiseMap = new Array(sizeX * sizeZ)
+      const isoNoiseMap = new Array(sizeX * sizeZ)
+      
+      for (let x = 0; x < sizeX; x++) {
+        for (let z = 0; z < sizeZ; z++) {
+          const index = x * sizeZ + z
+          noiseMap[index] = noise2D(x * noiseFrequency, z * noiseFrequency)
+          isoNoiseMap[index] = noise2D((x + 1000) * noiseFrequency, (z + 1000) * noiseFrequency)
+        }
+      }
+      
+      for (let x = 0; x < sizeX; x++) {
+        for (let z = 0; z < sizeZ; z++) {
+          const index = x * sizeZ + z
+          const noiseValue = noiseMap[index]
+          const height = Math.floor(baseHeight + (noiseValue * heightMultiplier))
+          
+          // Generate cubes from bottom up to the height, but only if above isolevel
+          for (let y = 0; y <= height && y < sizeY; y++) {
+            const isoNoiseValue = isoNoiseMap[index]
+            
+            // Only show cube if noise value is above isolevel
+            if (isoNoiseValue > isolevel) {
+              // Center the chunk around origin
+              const centeredX = x - sizeX / 2 + 0.5
+              const centeredY = y - sizeY / 2 + 0.5
+              const centeredZ = z - sizeZ / 2 + 0.5
+              
+              positions.push([centeredX, centeredY, centeredZ])
+            }
           }
         }
       }
     }
     
     return positions
-  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger])
+  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D])
 
   // Update instanced mesh positions
   useEffect(() => {

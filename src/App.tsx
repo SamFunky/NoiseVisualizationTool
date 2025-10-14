@@ -13,6 +13,7 @@ function App() {
   // State for controlling when to update the 3D terrain
   const [autoUpdate, setAutoUpdate] = useState(true)
   const [manualUpdateTrigger, setManualUpdateTrigger] = useState(0)
+  const [use3D, setUse3D] = useState(false) // Track 3D noise mode
   
   // State for chunk dimensions
   const [chunkSize, setChunkSize] = useState({ x: 32, y: 32, z: 32 })
@@ -159,6 +160,7 @@ function App() {
           verticalOffset={autoUpdate ? verticalOffset : frozenVerticalOffset}
           noiseSettings={autoUpdate ? noiseSettings : frozenValues.noiseSettings}
           updateTrigger={manualUpdateTrigger}
+          use3D={use3D}
         />
         
         {/* Wireframe showing chunk boundaries */}
@@ -193,6 +195,7 @@ function App() {
           setFrozenValues({ isolevel, amplitude, verticalOffsetPercent, noiseSettings })
           setManualUpdateTrigger(prev => prev + 1)
         }}
+        on3DModeChange={setUse3D}
       />
       
       {/* Chunk size controls at bottom */}

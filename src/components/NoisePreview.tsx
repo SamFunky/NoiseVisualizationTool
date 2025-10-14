@@ -7,16 +7,18 @@ interface NoisePreviewProps {
   autoUpdate: boolean
   onAutoUpdateChange: (value: boolean) => void
   onManualUpdate: () => void
+  on3DModeChange: (is3D: boolean) => void
 }
 
-export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, onManualUpdate }: NoisePreviewProps) {
+export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, onManualUpdate, on3DModeChange }: NoisePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [position, setPosition] = useState({ x: 20, y: 20 }) // Start in top left corner
+  const [is3D, setIs3D] = useState(false) // Toggle between 2D and 3D noise for chunk generation
   const dragOffset = useRef({ x: 0, y: 0 })
 
-  // Generate noise texture
+  // Generate noise texture - always show 2D preview
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -32,7 +34,7 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
     const imageData = ctx.createImageData(width, height)
     const data = imageData.data
 
-    // Create noise generator with current settings
+    // Always use 2D noise for preview visualization
     const noise2D = makeNoise2D(noiseSettings.seed)
 
     for (let y = 0; y < height; y++) {
@@ -158,7 +160,8 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
         textAlign: 'center',
         marginBottom: '8px'
       }}>
-        32×32 raw noise pattern<br/>
+        32×32 2D noise preview<br/>
+        {is3D ? 'Terrain uses 3D noise' : 'Terrain uses 2D noise'}<br/>
         White: High | Black: Low
       </div>
       
@@ -167,10 +170,54 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
         borderTop: '1px solid #3c4043',
         paddingTop: '8px',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
+        flexDirection: 'column',
         gap: '8px'
       }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '8px'
+        }}>
+          <label style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            fontSize: '11px',
+            cursor: 'pointer',
+            userSelect: 'none'
+          }}>
+            <input
+              type="checkbox"
+              checked={autoUpdate}
+              onChange={(e) => onAutoUpdateChange(e.target.checked)}
+              style={{
+                width: '12px',
+                height: '12px',
+                accentColor: '#4CAF50'
+              }}
+            />
+            Auto Update
+          </label>
+          
+          <button
+            onClick={onManualUpdate}
+            disabled={autoUpdate}
+            style={{
+              padding: '4px 8px',
+              fontSize: '10px',
+              backgroundColor: autoUpdate ? '#2a2d30' : '#4CAF50',
+              color: autoUpdate ? '#666' : '#ffffff',
+              border: '1px solid #3c4043',
+              borderRadius: '3px',
+              cursor: autoUpdate ? 'not-allowed' : 'pointer',
+              fontWeight: 'bold'
+            }}
+          >
+            Update 3D
+          </button>
+        </div>
+        
         <label style={{
           display: 'flex',
           alignItems: 'center',
@@ -181,33 +228,20 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
         }}>
           <input
             type="checkbox"
-            checked={autoUpdate}
-            onChange={(e) => onAutoUpdateChange(e.target.checked)}
+            checked={is3D}
+            onChange={(e) => {
+              const newIs3D = e.target.checked
+              setIs3D(newIs3D)
+              on3DModeChange(newIs3D)
+            }}
             style={{
               width: '12px',
               height: '12px',
               accentColor: '#4CAF50'
             }}
           />
-          Auto Update
+          Use 3D Noise for Terrain
         </label>
-        
-        <button
-          onClick={onManualUpdate}
-          disabled={autoUpdate}
-          style={{
-            padding: '4px 8px',
-            fontSize: '10px',
-            backgroundColor: autoUpdate ? '#2a2d30' : '#4CAF50',
-            color: autoUpdate ? '#666' : '#ffffff',
-            border: '1px solid #3c4043',
-            borderRadius: '3px',
-            cursor: autoUpdate ? 'not-allowed' : 'pointer',
-            fontWeight: 'bold'
-          }}
-        >
-          Update 3D
-        </button>
       </div>
     </div>
   )
