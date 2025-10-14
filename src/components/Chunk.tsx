@@ -149,7 +149,7 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
     if (!isSmooth) return null
     
     const densityFunction = createDensityFunction()
-    const result = generateMarchingCubes(sizeX, sizeY, sizeZ, densityFunction, isolevel)
+    const result = generateMarchingCubes(sizeX, sizeY, sizeZ, densityFunction, isolevel, use3D)
     
     const geometry = new BufferGeometry()
     geometry.setAttribute('position', new BufferAttribute(result.vertices, 3))
