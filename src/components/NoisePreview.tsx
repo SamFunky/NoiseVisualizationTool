@@ -69,11 +69,39 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
     }
 
     // Configure fractals if enabled
-    if (noiseSettings.fractalOctaves > 1) {
-      fastNoise.SetFractalType(FastNoiseLite.FractalType.FBm)
+    if (noiseSettings.fractalType !== 'None') {
+      // Map fractal type from settings
+      switch (noiseSettings.fractalType) {
+        case 'FBm':
+          fastNoise.SetFractalType(FastNoiseLite.FractalType.FBm)
+          break
+        case 'Ridged':
+          fastNoise.SetFractalType(FastNoiseLite.FractalType.Ridged)
+          break
+        case 'PingPong':
+          fastNoise.SetFractalType(FastNoiseLite.FractalType.PingPong)
+          break
+        case 'DomainWarpProgressive':
+          fastNoise.SetFractalType(FastNoiseLite.FractalType.DomainWarpProgressive)
+          break
+        case 'DomainWarpIndependent':
+          fastNoise.SetFractalType(FastNoiseLite.FractalType.DomainWarpIndependent)
+          break
+        default:
+          fastNoise.SetFractalType(FastNoiseLite.FractalType.FBm)
+      }
+      
       fastNoise.SetFractalOctaves(noiseSettings.fractalOctaves)
       fastNoise.SetFractalLacunarity(noiseSettings.fractalLacunarity)
       fastNoise.SetFractalGain(noiseSettings.fractalGain)
+      
+      // Set additional fractal properties if available
+      if (noiseSettings.fractalWeightedStrength !== undefined) {
+        fastNoise.SetFractalWeightedStrength(noiseSettings.fractalWeightedStrength)
+      }
+      if (noiseSettings.fractalPingPongStrength !== undefined) {
+        fastNoise.SetFractalPingPongStrength(noiseSettings.fractalPingPongStrength)
+      }
     }
 
     // Configure domain warp if enabled
