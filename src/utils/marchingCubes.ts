@@ -372,6 +372,133 @@ function calculateNormal(x: number, y: number, z: number, densityFunction: (x: n
   return { x: 0, y: 1, z: 0 }
 }
 
+// Add solid boundary faces that follow the terrain contours
+function addBoundaryFaces(
+  vertices: Vec3[],
+  normals: Vec3[],
+  indices: number[],
+  sizeX: number,
+  sizeY: number,
+  sizeZ: number,
+  densityFunction: (x: number, y: number, z: number) => number,
+  isolevel: number
+): void {
+  const addTriangle = (v1: Vec3, v2: Vec3, v3: Vec3, normal: Vec3) => {
+    const baseIndex = vertices.length
+    vertices.push(v1, v2, v3)
+    normals.push(normal, normal, normal)
+    indices.push(baseIndex, baseIndex + 1, baseIndex + 2)
+  }
+
+  // Helper to find terrain surface height at a given x,z coordinate
+  const findTerrainHeight = (x: number, z: number): number => {
+    // Search from top to bottom to find where terrain transitions from outside to inside
+    for (let y = sizeY - 1; y >= 0; y--) {
+      if (densityFunction(x, y, z) < isolevel) {
+        // Found the surface - interpolate for more precision
+        if (y < sizeY - 1) {
+          const val1 = densityFunction(x, y, z)
+          const val2 = densityFunction(x, y + 1, z)
+          const t = (isolevel - val1) / (val2 - val1)
+          return y + t
+        }
+        return y
+      }
+    }
+    return 0 // If no surface found, return bottom
+  }
+
+  const step = 1 // Resolution for boundary faces
+  
+  // Bottom face - only add where terrain is solid
+  for (let x = 0; x < sizeX - step; x += step) {
+    for (let z = 0; z < sizeZ - step; z += step) {
+      if (densityFunction(x + step/2, 0, z + step/2) < isolevel) {
+        const v1 = { x: x, y: 0, z: z }
+        const v2 = { x: x + step, y: 0, z: z }
+        const v3 = { x: x + step, y: 0, z: z + step }
+        const v4 = { x: x, y: 0, z: z + step }
+        const normal = { x: 0, y: -1, z: 0 }
+        
+        addTriangle(v1, v2, v3, normal)
+        addTriangle(v1, v3, v4, normal)
+      }
+    }
+  }
+
+  // Front face (z = 0) - follow terrain contour
+  for (let x = 0; x < sizeX - step; x += step) {
+    const height1 = findTerrainHeight(x, 0)
+    const height2 = findTerrainHeight(x + step, 0)
+    
+    if (height1 > 0 || height2 > 0) {
+      const v1 = { x: x, y: 0, z: 0 }
+      const v2 = { x: x + step, y: 0, z: 0 }
+      const v3 = { x: x + step, y: height2, z: 0 }
+      const v4 = { x: x, y: height1, z: 0 }
+      const normal = { x: 0, y: 0, z: -1 }
+      
+      // Flip winding order for outward-facing triangles
+      addTriangle(v1, v4, v3, normal)
+      addTriangle(v1, v3, v2, normal)
+    }
+  }
+
+  // Back face (z = sizeZ - 1) - follow terrain contour, moved closer to terrain
+  for (let x = 0; x < sizeX - step; x += step) {
+    const height1 = findTerrainHeight(x, sizeZ - 1)
+    const height2 = findTerrainHeight(x + step, sizeZ - 1)
+    
+    if (height1 > 0 || height2 > 0) {
+      const v1 = { x: x, y: 0, z: sizeZ - 1 }
+      const v2 = { x: x, y: height1, z: sizeZ - 1 }
+      const v3 = { x: x + step, y: height2, z: sizeZ - 1 }
+      const v4 = { x: x + step, y: 0, z: sizeZ - 1 }
+      const normal = { x: 0, y: 0, z: 1 }
+      
+      // Flip winding order for outward-facing triangles
+      addTriangle(v1, v4, v3, normal)
+      addTriangle(v1, v3, v2, normal)
+    }
+  }
+
+  // Left face (x = 0) - follow terrain contour
+  for (let z = 0; z < sizeZ - step; z += step) {
+    const height1 = findTerrainHeight(0, z)
+    const height2 = findTerrainHeight(0, z + step)
+    
+    if (height1 > 0 || height2 > 0) {
+      const v1 = { x: 0, y: 0, z: z }
+      const v2 = { x: 0, y: height1, z: z }
+      const v3 = { x: 0, y: height2, z: z + step }
+      const v4 = { x: 0, y: 0, z: z + step }
+      const normal = { x: -1, y: 0, z: 0 }
+      
+      // Flip winding order for outward-facing triangles
+      addTriangle(v1, v4, v3, normal)
+      addTriangle(v1, v3, v2, normal)
+    }
+  }
+
+  // Right face (x = sizeX - 1) - follow terrain contour, moved closer to terrain
+  for (let z = 0; z < sizeZ - step; z += step) {
+    const height1 = findTerrainHeight(sizeX - 1, z)
+    const height2 = findTerrainHeight(sizeX - 1, z + step)
+    
+    if (height1 > 0 || height2 > 0) {
+      const v1 = { x: sizeX - 1, y: 0, z: z }
+      const v2 = { x: sizeX - 1, y: 0, z: z + step }
+      const v3 = { x: sizeX - 1, y: height2, z: z + step }
+      const v4 = { x: sizeX - 1, y: height1, z: z }
+      const normal = { x: 1, y: 0, z: 0 }
+      
+      // Flip winding order for outward-facing triangles
+      addTriangle(v1, v4, v3, normal)
+      addTriangle(v1, v3, v2, normal)
+    }
+  }
+}
+
 export function generateMarchingCubes(
   sizeX: number,
   sizeY: number,
@@ -447,6 +574,9 @@ export function generateMarchingCubes(
       }
     }
   }
+  
+  // Add solid boundary faces to match the blocky version
+  addBoundaryFaces(vertices, normals, indices, sizeX, sizeY, sizeZ, densityFunction, isolevel)
   
   // Convert to typed arrays
   const vertexArray = new Float32Array(vertices.length * 3)
