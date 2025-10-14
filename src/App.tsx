@@ -14,6 +14,7 @@ function App() {
   const [autoUpdate, setAutoUpdate] = useState(true)
   const [manualUpdateTrigger, setManualUpdateTrigger] = useState(0)
   const [use3D, setUse3D] = useState(false) // Track 3D noise mode
+  const [isSmooth, setIsSmooth] = useState(false) // Track smooth rendering mode
   
   // State for chunk dimensions
   const [chunkSize, setChunkSize] = useState({ x: 32, y: 32, z: 32 })
@@ -161,6 +162,7 @@ function App() {
           noiseSettings={autoUpdate ? noiseSettings : frozenValues.noiseSettings}
           updateTrigger={manualUpdateTrigger}
           use3D={use3D}
+          isSmooth={isSmooth}
         />
         
         {/* Wireframe showing chunk boundaries */}
@@ -196,6 +198,7 @@ function App() {
           setManualUpdateTrigger(prev => prev + 1)
         }}
         on3DModeChange={setUse3D}
+        onSmoothModeChange={setIsSmooth}
       />
       
       {/* Chunk size controls at bottom */}

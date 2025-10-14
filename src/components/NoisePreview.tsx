@@ -8,9 +8,10 @@ interface NoisePreviewProps {
   onAutoUpdateChange: (value: boolean) => void
   onManualUpdate: () => void
   on3DModeChange: (is3D: boolean) => void
+  onSmoothModeChange: (isSmooth: boolean) => void
 }
 
-export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, onManualUpdate, on3DModeChange }: NoisePreviewProps) {
+export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, onManualUpdate, on3DModeChange, onSmoothModeChange }: NoisePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -371,7 +372,9 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
           <span style={{ color: '#ccc', fontSize: '10px', width: '35px', textAlign: 'right' }}>Blocky</span>
           <div 
             onClick={() => {
-              setIsSmooth(!isSmooth)
+              const newIsSmooth = !isSmooth
+              setIsSmooth(newIsSmooth)
+              onSmoothModeChange(newIsSmooth)
             }}
             style={{
               position: 'relative',

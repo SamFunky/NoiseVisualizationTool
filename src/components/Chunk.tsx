@@ -1,6 +1,7 @@
 import { useMemo, useRef, useEffect } from 'react'
 import FastNoiseLite from 'fastnoise-lite'
-import { InstancedMesh, Object3D } from 'three'
+import { InstancedMesh, Object3D, BufferGeometry, BufferAttribute, Mesh } from 'three'
+import { generateMarchingCubes } from '../utils/marchingCubes'
 
 export interface NoiseSettings {
   // General
@@ -39,10 +40,12 @@ interface ChunkProps {
   noiseSettings?: NoiseSettings // FastNoise Lite settings
   updateTrigger?: number // Trigger value to force updates when auto-update is off
   use3D?: boolean // Whether to use 3D noise or 2D noise
+  isSmooth?: boolean // Whether to use smooth (marching cubes) or blocky rendering
 }
 
-export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger, use3D = false }: ChunkProps) {
+export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger, use3D = false, isSmooth = false }: ChunkProps) {
   const meshRef = useRef<InstancedMesh>(null)
+  const smoothMeshRef = useRef<Mesh>(null)
   
   // Helper function to configure FastNoiseLite based on settings
   const createNoiseGenerator = () => {
@@ -92,6 +95,41 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
     
     return fastNoise
   }
+
+  // Create density function for marching cubes
+  const createDensityFunction = () => {
+    const fastNoise = createNoiseGenerator()
+    
+    return (x: number, y: number, z: number): number => {
+      if (use3D) {
+        // Use 3D noise directly - invert for proper marching cubes convention
+        return -fastNoise.GetNoise(x, y, z)
+      } else {
+        // Use 2D noise for height-based terrain
+        const heightNoise = fastNoise.GetNoise(x, z)
+        const terrainHeight = verticalOffset + (heightNoise * amplitude)
+        
+        // Convert to signed distance field
+        // Negative values = inside surface, positive = outside
+        return y - terrainHeight
+      }
+    }
+  }
+
+  // Generate smooth geometry using marching cubes
+  const smoothGeometry = useMemo(() => {
+    if (!isSmooth) return null
+    
+    const densityFunction = createDensityFunction()
+    const result = generateMarchingCubes(sizeX, sizeY, sizeZ, densityFunction, isolevel)
+    
+    const geometry = new BufferGeometry()
+    geometry.setAttribute('position', new BufferAttribute(result.vertices, 3))
+    geometry.setAttribute('normal', new BufferAttribute(result.normals, 3))
+    geometry.setIndex(new BufferAttribute(result.indices, 1))
+    
+    return geometry
+  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D, isSmooth])
 
   // Generate cube positions based on noise and isolevel
   const cubePositions = useMemo(() => {
@@ -200,6 +238,15 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
 
   // Calculate max possible cubes for buffer allocation
   const maxCubes = sizeX * sizeY * sizeZ
+
+  // Conditional rendering based on smooth/blocky mode
+  if (isSmooth) {
+    return smoothGeometry ? (
+      <mesh ref={smoothMeshRef} geometry={smoothGeometry}>
+        <meshLambertMaterial color="#9c9c9cff" />
+      </mesh>
+    ) : null
+  }
 
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, maxCubes]}>
