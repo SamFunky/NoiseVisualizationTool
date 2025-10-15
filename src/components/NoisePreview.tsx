@@ -9,9 +9,11 @@ interface NoisePreviewProps {
   onManualUpdate: () => void
   on3DModeChange: (is3D: boolean) => void
   onSmoothModeChange: (isSmooth: boolean) => void
+  onMathExpressionChange: (expression: string) => void
+  mathExpression?: string
 }
 
-export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, onManualUpdate, on3DModeChange, onSmoothModeChange }: NoisePreviewProps) {
+export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, onManualUpdate, on3DModeChange, onSmoothModeChange, onMathExpressionChange, mathExpression = "N" }: NoisePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -295,6 +297,61 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
         }}>
           <span>0.01x</span>
           <span>1.00x</span>
+        </div>
+      </div>
+      
+      {/* Math Expression Control */}
+      <div style={{
+        marginBottom: '8px',
+        paddingBottom: '8px',
+        borderBottom: '1px solid #3c4043'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '4px'
+        }}>
+          <label style={{
+            fontSize: '11px',
+            color: '#ccc',
+            fontWeight: 'bold'
+          }}>
+            Math Expression
+          </label>
+          <span style={{
+            fontSize: '9px',
+            color: '#888'
+          }}>
+            Use "N" for noise
+          </span>
+        </div>
+        <input
+          type="text"
+          value={mathExpression}
+          onChange={(e) => onMathExpressionChange(e.target.value)}
+          placeholder="N"
+          style={{
+            width: '100%',
+            padding: '6px 8px',
+            fontSize: '11px',
+            backgroundColor: '#2a2d30',
+            border: '1px solid #3c4043',
+            borderRadius: '4px',
+            color: '#ffffff',
+            fontFamily: 'monospace',
+            outline: 'none'
+          }}
+          onFocus={(e) => e.target.style.borderColor = '#4CAF50'}
+          onBlur={(e) => e.target.style.borderColor = '#3c4043'}
+        />
+        <div style={{
+          fontSize: '9px',
+          color: '#666',
+          marginTop: '3px',
+          lineHeight: '1.2'
+        }}>
+          Examples: N^2, |N|*1000, |N+0.5|^3, (N+1)^3*500
         </div>
       </div>
       

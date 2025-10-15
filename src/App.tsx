@@ -15,6 +15,7 @@ function App() {
   const [manualUpdateTrigger, setManualUpdateTrigger] = useState(0)
   const [use3D, setUse3D] = useState(false) // Track 3D noise mode
   const [isSmooth, setIsSmooth] = useState(false) // Track smooth rendering mode
+  const [mathExpression, setMathExpression] = useState("N") // Math expression for transforming noise
   
   // State for chunk dimensions
   const [chunkSize, setChunkSize] = useState({ x: 32, y: 32, z: 32 })
@@ -50,7 +51,7 @@ function App() {
       options: ['None', 'ImproveXYPlanes', 'ImproveXZPlanes']
     },
     seed: 1337,
-    frequency: 0.01
+    frequency: { value: 0.01, pad: 4 }
   })
 
   // Fractal settings
@@ -163,6 +164,7 @@ function App() {
           updateTrigger={manualUpdateTrigger}
           use3D={use3D}
           isSmooth={isSmooth}
+          mathExpression={mathExpression}
         />
         
         {/* Wireframe showing chunk boundaries */}
@@ -186,6 +188,8 @@ function App() {
       <NoisePreview 
         noiseSettings={noiseSettings}
         autoUpdate={autoUpdate}
+        mathExpression={mathExpression}
+        onMathExpressionChange={setMathExpression}
         onAutoUpdateChange={(value) => {
           if (!value) {
             // Freeze current values when turning auto-update off

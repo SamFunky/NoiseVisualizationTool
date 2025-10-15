@@ -41,11 +41,41 @@ interface ChunkProps {
   updateTrigger?: number // Trigger value to force updates when auto-update is off
   use3D?: boolean // Whether to use 3D noise or 2D noise
   isSmooth?: boolean // Whether to use smooth (marching cubes) or blocky rendering
+  mathExpression?: string // Math expression to transform noise values
 }
 
-export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger, use3D = false, isSmooth = false }: ChunkProps) {
+export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger, use3D = false, isSmooth = false, mathExpression = "N" }: ChunkProps) {
   const meshRef = useRef<InstancedMesh>(null)
   const smoothMeshRef = useRef<Mesh>(null)
+  
+  // Helper function to safely evaluate math expressions
+  const evaluateMathExpression = (expression: string, noiseValue: number): number => {
+    try {
+      // Create a safe evaluation environment
+      const N = noiseValue
+      
+      // Replace common math functions and operators
+      let safeExpression = expression
+        .replace(/\bN\b/g, N.toString())
+        .replace(/Math\./g, 'Math.')
+        // Convert |expression| to Math.abs(expression)
+        .replace(/\|([^|]+)\|/g, 'Math.abs($1)')
+        // Convert ^ operator to Math.pow() - handle parentheses and complex expressions
+        .replace(/([^()]+|\([^)]*\))\s*\^\s*([^()]+|\([^)]*\))/g, 'Math.pow($1, $2)')
+        // Handle nested ^ operators (right to left associativity)
+        .replace(/([^()]+|\([^)]*\))\s*\^\s*([^()]+|\([^)]*\))/g, 'Math.pow($1, $2)')
+      
+      // Create a function that evaluates the expression safely
+      const func = new Function('Math', `return ${safeExpression}`)
+      const result = func(Math)
+      
+      // Return the result if it's a valid number, otherwise return original noise
+      return isFinite(result) ? result : noiseValue
+    } catch (error) {
+      // If expression is invalid, return original noise value
+      return noiseValue
+    }
+  }
   
   // Helper function to configure FastNoiseLite based on settings
   const createNoiseGenerator = () => {
@@ -131,11 +161,15 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
     return (x: number, y: number, z: number): number => {
       if (use3D) {
         // Use 3D noise directly - invert for proper marching cubes convention
-        return -fastNoise.GetNoise(x, y, z)
+        const rawNoise = -fastNoise.GetNoise(x, y, z)
+        // Apply math expression transformation
+        return evaluateMathExpression(mathExpression, rawNoise)
       } else {
         // Use 2D noise for height-based terrain
         const heightNoise = fastNoise.GetNoise(x, z)
-        const terrainHeight = verticalOffset + (heightNoise * amplitude)
+        // Apply math expression transformation to the height noise
+        const transformedNoise = evaluateMathExpression(mathExpression, heightNoise)
+        const terrainHeight = verticalOffset + (transformedNoise * amplitude)
         
         // Convert to signed distance field
         // Negative values = inside surface, positive = outside
@@ -157,7 +191,7 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
     geometry.setIndex(new BufferAttribute(result.indices, 1))
     
     return geometry
-  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D, isSmooth])
+  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D, isSmooth, mathExpression])
 
   // Generate cube positions based on noise and isolevel
   const cubePositions = useMemo(() => {
@@ -175,7 +209,9 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
         for (let y = 0; y < sizeY; y++) {
           for (let z = 0; z < sizeZ; z++) {
             // Generate 3D noise value for this position
-            const noiseValue = fastNoise.GetNoise(x, y, z)
+            const rawNoise = fastNoise.GetNoise(x, y, z)
+            // Apply math expression transformation
+            const noiseValue = evaluateMathExpression(mathExpression, rawNoise)
             
             // Only show cube if noise value is above isolevel
             if (noiseValue > isolevel) {
@@ -210,8 +246,10 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
       for (let x = 0; x < sizeX; x++) {
         for (let z = 0; z < sizeZ; z++) {
           const index = x * sizeZ + z
-          const noiseValue = noiseMap[index]
-          const height = Math.floor(baseHeight + (noiseValue * heightMultiplier))
+          const rawNoise = noiseMap[index]
+          // Apply math expression transformation
+          const transformedNoise = evaluateMathExpression(mathExpression, rawNoise)
+          const height = Math.floor(baseHeight + (transformedNoise * heightMultiplier))
           
           // Generate cubes from bottom up to the height, but only if above isolevel
           for (let y = 0; y <= height && y < sizeY; y++) {
@@ -232,7 +270,7 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
     }
     
     return positions
-  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D])
+  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D, mathExpression])
 
   // Update instanced mesh positions
   useEffect(() => {
