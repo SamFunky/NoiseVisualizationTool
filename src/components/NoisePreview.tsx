@@ -23,6 +23,105 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
   const [isSmooth, setIsSmooth] = useState(false) // Toggle between blocky and smooth rendering
   const dragOffset = useRef({ x: 0, y: 0 })
 
+  // Helper to build base and warp engines (mirrors Chunk.tsx)
+  const buildEngines = () => {
+    const seed = noiseSettings.seed
+    const frequency = noiseSettings.frequency
+
+    const base = new FastNoiseLite()
+    base.SetSeed(seed)
+    base.SetFrequency(frequency)
+    switch (noiseSettings.noiseType) {
+      case 'Perlin': base.SetNoiseType(FastNoiseLite.NoiseType.Perlin); break
+      case 'OpenSimplex2': base.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2); break
+      case 'OpenSimplex2S': base.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2S); break
+      case 'Cellular':
+        base.SetNoiseType(FastNoiseLite.NoiseType.Cellular)
+        base.SetCellularDistanceFunction(FastNoiseLite.CellularDistanceFunction.EuclideanSq)
+        base.SetCellularReturnType(FastNoiseLite.CellularReturnType.Distance)
+        break
+      case 'ValueCubic': base.SetNoiseType(FastNoiseLite.NoiseType.ValueCubic); break
+      case 'Value': base.SetNoiseType(FastNoiseLite.NoiseType.Value); break
+      default: base.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2)
+    }
+    if (noiseSettings.fractalType !== 'None') {
+      switch (noiseSettings.fractalType) {
+        case 'FBm': base.SetFractalType(FastNoiseLite.FractalType.FBm); break
+        case 'Ridged': base.SetFractalType(FastNoiseLite.FractalType.Ridged); break
+        case 'PingPong': base.SetFractalType(FastNoiseLite.FractalType.PingPong); break
+        default: base.SetFractalType(FastNoiseLite.FractalType.None); break
+      }
+      if (noiseSettings.fractalType === 'FBm' || noiseSettings.fractalType === 'Ridged' || noiseSettings.fractalType === 'PingPong') {
+        base.SetFractalOctaves(noiseSettings.fractalOctaves)
+        base.SetFractalLacunarity(noiseSettings.fractalLacunarity)
+        base.SetFractalGain(noiseSettings.fractalGain)
+        if (noiseSettings.fractalWeightedStrength !== undefined) base.SetFractalWeightedStrength(noiseSettings.fractalWeightedStrength)
+        if (noiseSettings.fractalPingPongStrength !== undefined) base.SetFractalPingPongStrength(noiseSettings.fractalPingPongStrength)
+      }
+    }
+
+    let warp: FastNoiseLite | undefined
+    let warpY: FastNoiseLite | undefined
+    const warpAmp = noiseSettings.domainWarpAmp ?? 0
+    const warpFractalType = noiseSettings.domainWarpFractalType ?? 'None'
+    if (warpAmp !== 0 || warpFractalType !== 'None') {
+      const wSeed = (noiseSettings.domainWarpSeed ?? seed + 9999)
+      const wFreq = (noiseSettings.domainWarpFrequency ?? frequency)
+      warp = new FastNoiseLite()
+      warp.SetSeed(wSeed)
+      warp.SetFrequency(wFreq)
+      switch (noiseSettings.domainWarpType) {
+        case 'OpenSimplex2Reduced': warp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2Reduced); break
+        case 'BasicGrid': warp.SetDomainWarpType(FastNoiseLite.DomainWarpType.BasicGrid); break
+        default: warp.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2); break
+      }
+      warp.SetDomainWarpAmp(warpAmp)
+      if (typeof warp.SetDomainWarpFrequency === 'function' && noiseSettings.domainWarpFrequency != null) {
+        warp.SetDomainWarpFrequency(noiseSettings.domainWarpFrequency)
+      }
+      switch (warpFractalType) {
+        case 'Progressive':
+          if (typeof warp.SetDomainWarpFractalType === 'function') warp.SetDomainWarpFractalType(FastNoiseLite.DomainWarpFractalType.Progressive)
+          else warp.SetFractalType(FastNoiseLite.FractalType.DomainWarpProgressive)
+          break
+        case 'Independent':
+          if (typeof warp.SetDomainWarpFractalType === 'function') warp.SetDomainWarpFractalType(FastNoiseLite.DomainWarpFractalType.Independent)
+          else warp.SetFractalType(FastNoiseLite.FractalType.DomainWarpIndependent)
+          break
+        default:
+          if (typeof warp.SetDomainWarpFractalType === 'function') warp.SetDomainWarpFractalType(FastNoiseLite.DomainWarpFractalType.None)
+          else warp.SetFractalType(FastNoiseLite.FractalType.None)
+          break
+      }
+      if (warpFractalType !== 'None') {
+        if (typeof warp.SetDomainWarpFractalOctaves === 'function') warp.SetDomainWarpFractalOctaves(noiseSettings.domainWarpFractalOctaves)
+        else warp.SetFractalOctaves(noiseSettings.domainWarpFractalOctaves)
+        if (typeof warp.SetDomainWarpFractalLacunarity === 'function') warp.SetDomainWarpFractalLacunarity(noiseSettings.domainWarpFractalLacunarity)
+        else warp.SetFractalLacunarity(noiseSettings.domainWarpFractalLacunarity)
+        if (typeof warp.SetDomainWarpFractalGain === 'function') warp.SetDomainWarpFractalGain(noiseSettings.domainWarpFractalGain)
+        else warp.SetFractalGain(noiseSettings.domainWarpFractalGain)
+      }
+
+      // Second axis for manual fallback
+      warpY = new FastNoiseLite()
+      warpY.SetSeed(wSeed + 1337)
+      warpY.SetFrequency(wFreq)
+    }
+    return { base, warp, warpY }
+  }
+
+  // FBM helper used for manual warp
+  const fbm2D = (noise: FastNoiseLite, x: number, y: number, oct: number, lac: number, gain: number) => {
+    let amp = 1, freq = 1, sum = 0, norm = 0
+    for (let i = 0; i < Math.max(1, oct); i++) {
+      sum += amp * noise.GetNoise(x * freq, y * freq)
+      norm += amp
+      amp *= gain
+      freq *= lac
+    }
+    return sum / (norm || 1)
+  }
+
   // Generate noise texture - always show 2D preview
   useEffect(() => {
     const canvas = canvasRef.current
@@ -39,89 +138,34 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
     const imageData = ctx.createImageData(width, height)
     const data = imageData.data
 
-    // Use FastNoiseLite for preview visualization
-    const fastNoise = new FastNoiseLite()
-    fastNoise.SetSeed(noiseSettings.seed)
-    fastNoise.SetFrequency(noiseSettings.frequency)
-    
-    // Configure noise type based on settings
-    switch (noiseSettings.noiseType) {
-      case 'perlin':
-        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.Perlin)
-        break
-      case 'opensimplex2':
-        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2)
-        break
-      case 'opensimplex2s':
-        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2S)
-        break
-      case 'cellular':
-        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.Cellular)
-        fastNoise.SetCellularDistanceFunction(FastNoiseLite.CellularDistanceFunction.EuclideanSq)
-        fastNoise.SetCellularReturnType(FastNoiseLite.CellularReturnType.Distance)
-        break
-      case 'value_cubic':
-        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.ValueCubic)
-        break
-      case 'value':
-        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.Value)
-        break
-      default:
-        fastNoise.SetNoiseType(FastNoiseLite.NoiseType.OpenSimplex2)
-    }
+    const { base, warp, warpY } = buildEngines()
 
-    // Configure fractals if enabled
-    if (noiseSettings.fractalType !== 'None') {
-      // Map fractal type from settings
-      switch (noiseSettings.fractalType) {
-        case 'FBm':
-          fastNoise.SetFractalType(FastNoiseLite.FractalType.FBm)
-          break
-        case 'Ridged':
-          fastNoise.SetFractalType(FastNoiseLite.FractalType.Ridged)
-          break
-        case 'PingPong':
-          fastNoise.SetFractalType(FastNoiseLite.FractalType.PingPong)
-          break
-        case 'DomainWarpProgressive':
-          fastNoise.SetFractalType(FastNoiseLite.FractalType.DomainWarpProgressive)
-          break
-        case 'DomainWarpIndependent':
-          fastNoise.SetFractalType(FastNoiseLite.FractalType.DomainWarpIndependent)
-          break
-        default:
-          fastNoise.SetFractalType(FastNoiseLite.FractalType.FBm)
-      }
-      
-      fastNoise.SetFractalOctaves(noiseSettings.fractalOctaves)
-      fastNoise.SetFractalLacunarity(noiseSettings.fractalLacunarity)
-      fastNoise.SetFractalGain(noiseSettings.fractalGain)
-      
-      // Set additional fractal properties if available
-      if (noiseSettings.fractalWeightedStrength !== undefined) {
-        fastNoise.SetFractalWeightedStrength(noiseSettings.fractalWeightedStrength)
-      }
-      if (noiseSettings.fractalPingPongStrength !== undefined) {
-        fastNoise.SetFractalPingPongStrength(noiseSettings.fractalPingPongStrength)
-      }
-    }
-
-    // Configure domain warp if enabled
-    if (noiseSettings.domainWarpAmp > 0) {
-      fastNoise.SetDomainWarpType(FastNoiseLite.DomainWarpType.OpenSimplex2)
-      fastNoise.SetDomainWarpAmp(noiseSettings.domainWarpAmp)
-    }
+    const amp = noiseSettings.domainWarpAmp ?? 0
+    const useWarp = !!warp && amp !== 0
+    const oct = noiseSettings.domainWarpFractalType !== 'None' ? noiseSettings.domainWarpFractalOctaves : 1
+    const lac = noiseSettings.domainWarpFractalLacunarity ?? 2.0
+    const gain = noiseSettings.domainWarpFractalGain ?? 0.5
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         // Apply zoom level to the coordinates - higher zoom = more detailed view
         // Center the zoom by offsetting coordinates to zoom from the center
         const centerOffset = 16 // Half of 32 (chunk size)
-        const nx = ((x / width * 32) - centerOffset) / zoomLevel + centerOffset
-        const nz = ((y / height * 32) - centerOffset) / zoomLevel + centerOffset
+        let nx = ((x / width * 32) - centerOffset) / zoomLevel + centerOffset
+        let nz = ((y / height * 32) - centerOffset) / zoomLevel + centerOffset
+
+        if (useWarp) {
+          // Manual domain warp: two independent offsets
+          const wy = warpY ?? warp!
+          const dx = fbm2D(warp!, nx, nz, oct, lac, gain) * amp
+          const dy = fbm2D(wy, nx + 123.45, nz - 987.65, oct, lac, gain) * amp
+          nx += dx
+          nz += dy
+        }
 
         // Generate raw noise value
-        const noiseValue = fastNoise.GetNoise(nx, nz)
+        // Domain warp is applied automatically by FastNoiseLite when configured
+        const noiseValue = base.GetNoise(nx, nz)
         
         // Convert raw noise (-1 to 1) directly to grayscale (0-255)
         // This shows the pure noise pattern without terrain modifications

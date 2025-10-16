@@ -5,6 +5,13 @@ declare module 'fastnoise-lite' {
     // Noise generation methods
     GetNoise(x: number, y: number): number
     GetNoise(x: number, y: number, z: number): number
+
+    // Domain warp methods (mutate coords in-place)
+    // Prefer DomainWarp when available; DomainWrap kept for compatibility
+    DomainWarp?(coord: { x: number, y: number }): void
+    DomainWarp?(coord: { x: number, y: number, z: number }): void
+    DomainWrap?(coord: { x: number, y: number }): void
+    DomainWrap?(coord: { x: number, y: number, z: number }): void
     
     // Configuration methods
     SetSeed(seed: number): void
@@ -28,10 +35,11 @@ declare module 'fastnoise-lite' {
     // Domain warp configuration
     SetDomainWarpType(domainWarpType: string): void
     SetDomainWarpAmp(domainWarpAmp: number): void
-    SetDomainWarpFractalType(domainWarpFractalType: string): void
-    SetDomainWarpFractalOctaves(octaves: number): void
-    SetDomainWarpFractalLacunarity(lacunarity: number): void
-    SetDomainWarpFractalGain(gain: number): void
+    SetDomainWarpFrequency?(frequency: number): void
+    SetDomainWarpFractalType?(domainWarpFractalType: string): void
+    SetDomainWarpFractalOctaves?(octaves: number): void
+    SetDomainWarpFractalLacunarity?(lacunarity: number): void
+    SetDomainWarpFractalGain?(gain: number): void
     
     // Static properties
     static NoiseType: {

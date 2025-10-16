@@ -86,7 +86,9 @@ function App() {
       value: 'OpenSimplex2', 
       options: ['OpenSimplex2', 'OpenSimplex2Reduced', 'BasicGrid']
     },
-    amplitude: { value: 1.0, min: 0.0, max: 10.0, step: 0.1 }
+    amplitude: 1.0,
+    seed: 1337,
+    frequency: { value: 0.01, pad: 4 }
   })
 
   // Domain Warp Fractal settings
@@ -121,6 +123,8 @@ function App() {
     // Domain Warp
     domainWarpType: domainWarpSettings.type,
     domainWarpAmp: domainWarpSettings.amplitude,
+    domainWarpSeed: domainWarpSettings.seed,
+    domainWarpFrequency: domainWarpSettings.frequency,
     // Domain Warp Fractal
     domainWarpFractalType: domainWarpFractalSettings.type,
     domainWarpFractalOctaves: domainWarpFractalSettings.octaves,
