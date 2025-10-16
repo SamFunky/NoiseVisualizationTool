@@ -19,6 +19,9 @@ function App() {
   
   // State for chunk dimensions
   const [chunkSize, setChunkSize] = useState({ x: 32, y: 32, z: 32 })
+  // New: offsets shared by preview and chunk
+  const [offsetX, setOffsetX] = useState(0)
+  const [offsetZ, setOffsetZ] = useState(0)
   
   // Snapshot values when auto-update is turned off or manual update button is clicked
   const [frozenValues, setFrozenValues] = useState({
@@ -169,6 +172,8 @@ function App() {
           use3D={use3D}
           isSmooth={isSmooth}
           mathExpression={mathExpression}
+          offsetX={offsetX}
+          offsetZ={offsetZ}
         />
         
         {/* Wireframe showing chunk boundaries */}
@@ -207,6 +212,9 @@ function App() {
         }}
         on3DModeChange={setUse3D}
         onSmoothModeChange={setIsSmooth}
+        offsetX={offsetX}
+        offsetZ={offsetZ}
+        onOffsetsChange={(x, z) => { setOffsetX(x); setOffsetZ(z) }}
       />
       
       {/* Chunk size controls at bottom */}

@@ -11,9 +11,13 @@ interface NoisePreviewProps {
   onSmoothModeChange: (isSmooth: boolean) => void
   onMathExpressionChange: (expression: string) => void
   mathExpression?: string
+  // New: external offsets binding so App can sync chunk
+  offsetX?: number
+  offsetZ?: number
+  onOffsetsChange?: (x: number, z: number) => void
 }
 
-export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, onManualUpdate, on3DModeChange, onSmoothModeChange, onMathExpressionChange, mathExpression = "N" }: NoisePreviewProps) {
+export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, onManualUpdate, on3DModeChange, onSmoothModeChange, onMathExpressionChange, mathExpression = "N", offsetX: propOffsetX, offsetZ: propOffsetZ, onOffsetsChange }: NoisePreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
@@ -22,6 +26,20 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
   const [zoomLevel, setZoomLevel] = useState(1.0) // Zoom level for noise preview (1.0 = normal, higher = more zoomed in)
   const [isSmooth, setIsSmooth] = useState(false) // Toggle between blocky and smooth rendering
   const dragOffset = useRef({ x: 0, y: 0 })
+  // Offsets: use controlled props when provided, otherwise local state
+  const [offsetXState, setOffsetXState] = useState(0)
+  const [offsetZState, setOffsetZState] = useState(0)
+  const offsetX = propOffsetX ?? offsetXState
+  const offsetZ = propOffsetZ ?? offsetZState
+
+  const setOffsetX = (v: number) => {
+    if (onOffsetsChange) onOffsetsChange(v, offsetZ)
+    else setOffsetXState(v)
+  }
+  const setOffsetZ = (v: number) => {
+    if (onOffsetsChange) onOffsetsChange(offsetX, v)
+    else setOffsetZState(v)
+  }
 
   // Helper to build base and warp engines (mirrors Chunk.tsx)
   const buildEngines = () => {
@@ -148,11 +166,10 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        // Apply zoom level to the coordinates - higher zoom = more detailed view
-        // Center the zoom by offsetting coordinates to zoom from the center
+        // Apply zoom level and offsets
         const centerOffset = 16 // Half of 32 (chunk size)
-        let nx = ((x / width * 32) - centerOffset) / zoomLevel + centerOffset
-        let nz = ((y / height * 32) - centerOffset) / zoomLevel + centerOffset
+        let nx = ((x / width * 32) - centerOffset) / zoomLevel + centerOffset + offsetX
+        let nz = ((y / height * 32) - centerOffset) / zoomLevel + centerOffset + offsetZ
 
         if (useWarp) {
           // Manual domain warp: two independent offsets
@@ -180,7 +197,7 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
     }
 
     ctx.putImageData(imageData, 0, 0)
-  }, [noiseSettings, zoomLevel])
+  }, [noiseSettings, zoomLevel, offsetX, offsetZ])
 
   // Dragging functionality
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -341,6 +358,72 @@ export function NoisePreview({ noiseSettings, autoUpdate, onAutoUpdateChange, on
         }}>
           <span>0.01x</span>
           <span>1.00x</span>
+        </div>
+      </div>
+      
+      {/* Offsets Control */}
+      <div style={{
+        marginBottom: '8px',
+        paddingBottom: '8px',
+        borderBottom: '1px solid #3c4043'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '6px'
+        }}>
+          <label style={{ fontSize: '11px', color: '#ccc', fontWeight: 'bold' }}>Offsets</label>
+          <button
+            onClick={() => { setOffsetX(0); setOffsetZ(0) }}
+            style={{
+              padding: '2px 6px',
+              fontSize: '10px',
+              backgroundColor: '#2a2d30',
+              color: '#ccc',
+              border: '1px solid #3c4043',
+              borderRadius: '3px',
+              cursor: 'pointer'
+            }}
+          >Reset</button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+          <span style={{ width: 14, color: '#aaa', fontSize: '10px' }}>X</span>
+          <input
+            type="range"
+            min={-64}
+            max={64}
+            step={0.1}
+            value={offsetX}
+            onChange={(e) => setOffsetX(parseFloat(e.target.value))}
+            style={{ flex: 1 }}
+          />
+          <input
+            type="number"
+            value={offsetX}
+            step={0.1}
+            onChange={(e) => setOffsetX(Number(e.target.value))}
+            style={{ width: '70px', background: '#2a2d30', color: '#fff', border: '1px solid #3c4043', borderRadius: 4, padding: '4px 6px', fontSize: 11 }}
+          />
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ width: 14, color: '#aaa', fontSize: '10px' }}>Z</span>
+          <input
+            type="range"
+            min={-64}
+            max={64}
+            step={0.1}
+            value={offsetZ}
+            onChange={(e) => setOffsetZ(parseFloat(e.target.value))}
+            style={{ flex: 1 }}
+          />
+          <input
+            type="number"
+            value={offsetZ}
+            step={0.1}
+            onChange={(e) => setOffsetZ(Number(e.target.value))}
+            style={{ width: '70px', background: '#2a2d30', color: '#fff', border: '1px solid #3c4043', borderRadius: 4, padding: '4px 6px', fontSize: 11 }}
+          />
         </div>
       </div>
       

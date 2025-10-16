@@ -44,9 +44,12 @@ interface ChunkProps {
   use3D?: boolean // Whether to use 3D noise or 2D noise
   isSmooth?: boolean // Whether to use smooth (marching cubes) or blocky rendering
   mathExpression?: string // Math expression to transform noise values
+  // New: offsets applied to X and Z axes before warping
+  offsetX?: number
+  offsetZ?: number
 }
 
-export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger, use3D = false, isSmooth = false, mathExpression = "N" }: ChunkProps) {
+export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, amplitude = 8, verticalOffset = 8, noiseSettings, updateTrigger, use3D = false, isSmooth = false, mathExpression = "N", offsetX = 0, offsetZ = 0 }: ChunkProps) {
   const meshRef = useRef<InstancedMesh>(null)
   const smoothMeshRef = useRef<Mesh>(null)
   
@@ -264,11 +267,12 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
 
     return (x: number, y: number, z: number): number => {
       if (use3D) {
-        const p = applyWarp3D(x, y, z)
+        // Apply offsets on X/Z first
+        const p = applyWarp3D(x + offsetX, y, z + offsetZ)
         const rawNoise = -base.GetNoise(p.x, p.y, p.z)
         return evaluateMathExpression(mathExpression, rawNoise)
       } else {
-        const p = applyWarp2D(x, z)
+        const p = applyWarp2D(x + offsetX, z + offsetZ)
         const heightNoise = base.GetNoise(p.x, p.y)
         const transformedNoise = evaluateMathExpression(mathExpression, heightNoise)
         const terrainHeight = verticalOffset + (transformedNoise * amplitude)
@@ -290,7 +294,7 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
     geometry.setIndex(new BufferAttribute(result.indices, 1))
     
     return geometry
-  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D, isSmooth, mathExpression])
+  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D, isSmooth, mathExpression, offsetX, offsetZ])
 
   // Generate cube positions based on noise and isolevel
   const cubePositions = useMemo(() => {
@@ -307,7 +311,7 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
       for (let x = 0; x < sizeX; x++) {
         for (let y = 0; y < sizeY; y++) {
           for (let z = 0; z < sizeZ; z++) {
-            let wx = x, wy = y, wz = z
+            let wx = x + offsetX, wy = y, wz = z + offsetZ
             if (warp && ampW !== 0) {
               const wyN = warpY ?? warp
               const dx = fbm3D(warp, wx, wy, wz, octW, lacW, gainW) * ampW
@@ -339,7 +343,7 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
       for (let x = 0; x < sizeX; x++) {
         for (let z = 0; z < sizeZ; z++) {
           const index = x * sizeZ + z
-          let wx = x, wz = z
+          let wx = x + offsetX, wz = z + offsetZ
           if (warp && ampW !== 0) {
             const wyN = warpY ?? warp
             const dx = fbm2D(warp, wx, wz, octW, lacW, gainW) * ampW
@@ -369,7 +373,7 @@ export function Chunk({ sizeX = 32, sizeY = 32, sizeZ = 32, isolevel = 0.0, ampl
       }
     }
     return positions
-  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D, mathExpression])
+  }, [sizeX, sizeY, sizeZ, isolevel, amplitude, verticalOffset, noiseSettings, updateTrigger, use3D, mathExpression, offsetX, offsetZ])
 
   // Update instanced mesh positions
   useEffect(() => {
